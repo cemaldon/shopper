@@ -2,3 +2,5 @@ numpy
 pandas
 openvino>=2024.0.0
 
+mlxtend
+flask
