@@ -1,0 +1,92 @@
+"""Flask API wrapper for the grocery suggestion engine."""
+
+from flask import Flask, request, jsonify
+from app import build_association_rules, suggest_items
+
+# Simulated grocery history (can be replaced with database)
+GROCERY_HISTORY = [
+    ["milk", "bread", "eggs", "apples"],
+    ["milk", "bread", "cereal"],
+    ["eggs", "bread", "butter"],
+    ["milk", "bread", "eggs", "butter"],
+    ["milk", "cereal", "apples"],
+    ["eggs", "butter"],
+    ["milk", "bread", "eggs"],
+]
+
+app = Flask(__name__)
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "healthy"})
+
+
+@app.route("/suggest", methods=["POST"])
+def get_suggestions():
+    """
+    Get suggestions for grocery items.
+    
+    Expected JSON:
+    {
+        "current_items": ["milk", "eggs"],
+        "min_support": 0.3,
+        "min_lift": 1.0,
+        "top_n": 5
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or "current_items" not in data:
+            return jsonify({"error": "Missing 'current_items' in request"}), 400
+
+        current_items = set(item.strip().lower() for item in data["current_items"] if item.strip())
+        if not current_items:
+            return jsonify({"error": "'current_items' cannot be empty"}), 400
+
+        min_support = data.get("min_support", 0.3)
+        min_lift = data.get("min_lift", 1.0)
+        top_n = data.get("top_n", 5)
+
+        # Validate parameters
+        if not (0 < min_support <= 1):
+            return jsonify({"error": "min_support must be between 0 and 1"}), 400
+        if min_lift < 0:
+            return jsonify({"error": "min_lift must be non-negative"}), 400
+        if top_n < 1:
+            return jsonify({"error": "top_n must be at least 1"}), 400
+
+        rules = build_association_rules(
+            GROCERY_HISTORY,
+            min_support=min_support,
+            metric="lift",
+            min_threshold=min_lift,
+        )
+
+        if rules.empty:
+            return jsonify({
+                "current_items": sorted(current_items),
+                "suggestions": [],
+                "message": "No association rules found with the given parameters"
+            }), 200
+
+        suggestions = suggest_items(current_items, rules, top_n=top_n)
+
+        return jsonify({
+            "current_items": sorted(current_items),
+            "suggestions": suggestions,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/history", methods=["GET"])
+def get_history():
+    """Get the current grocery history."""
+    return jsonify({"history": GROCERY_HISTORY}), 200
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
