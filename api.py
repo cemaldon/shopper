@@ -1,10 +1,11 @@
-"""Flask API wrapper for the grocery suggestion engine."""
+"""Flask API wrapper for the grocery suggestion engine with DB persistence."""
 
 from flask import Flask, request, jsonify
 from app import build_association_rules, suggest_items
+from db import SessionLocal, init_db
+from models import Product, Trip
 
-# Simulated grocery history (can be replaced with database)
-GROCERY_HISTORY = [
+INITIAL_HISTORY = [
     ["milk", "bread", "eggs", "apples"],
     ["milk", "bread", "cereal"],
     ["eggs", "bread", "butter"],
@@ -14,7 +15,41 @@ GROCERY_HISTORY = [
     ["milk", "bread", "eggs"],
 ]
 
+
 app = Flask(__name__)
+
+
+def get_grocery_history_from_db(session):
+    trips = session.query(Trip).order_by(Trip.id).all()
+    history = [[p.name for p in trip.products] for trip in trips]
+    return history
+
+
+def seed_db_if_empty(session):
+    # If there are no trips, seed from INITIAL_HISTORY
+    if session.query(Trip).first() is not None:
+        return
+
+    for trip_items in INITIAL_HISTORY:
+        trip = Trip()
+        for name in trip_items:
+            name = name.strip().lower()
+            prod = session.query(Product).filter_by(name=name).first()
+            if prod is None:
+                prod = Product(name=name)
+            trip.products.append(prod)
+        session.add(trip)
+    session.commit()
+
+
+@app.before_first_request
+def setup_db():
+    init_db()
+    db = SessionLocal()
+    try:
+        seed_db_if_empty(db)
+    finally:
+        db.close()
 
 
 @app.route("/health", methods=["GET"])
@@ -25,17 +60,6 @@ def health():
 
 @app.route("/suggest", methods=["POST"])
 def get_suggestions():
-    """
-    Get suggestions for grocery items.
-    
-    Expected JSON:
-    {
-        "current_items": ["milk", "eggs"],
-        "min_support": 0.3,
-        "min_lift": 1.0,
-        "top_n": 5
-    }
-    """
     try:
         data = request.get_json()
         if not data or "current_items" not in data:
@@ -57,8 +81,14 @@ def get_suggestions():
         if top_n < 1:
             return jsonify({"error": "top_n must be at least 1"}), 400
 
+        db = SessionLocal()
+        try:
+            grocery_history = get_grocery_history_from_db(db)
+        finally:
+            db.close()
+
         rules = build_association_rules(
-            GROCERY_HISTORY,
+            grocery_history,
             min_support=min_support,
             metric="lift",
             min_threshold=min_lift,
@@ -84,8 +114,12 @@ def get_suggestions():
 
 @app.route("/history", methods=["GET"])
 def get_history():
-    """Get the current grocery history."""
-    return jsonify({"history": GROCERY_HISTORY}), 200
+    db = SessionLocal()
+    try:
+        history = get_grocery_history_from_db(db)
+    finally:
+        db.close()
+    return jsonify({"history": history}), 200
 
 
 if __name__ == "__main__":

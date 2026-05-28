@@ -4,3 +4,5 @@ openvino>=2024.0.0
 
 mlxtend
 flask
+sqlalchemy
+alembic
