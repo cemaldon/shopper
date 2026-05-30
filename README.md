@@ -13,8 +13,11 @@ Install dependencies and run the migration to create tables:
 
 ```bash
 pip install -r requirements.txt
+export PYTHONPATH=.
 alembic upgrade head
 ```
+
+If Alembic has trouble importing the local app modules, make sure `PYTHONPATH=.` is set before running `alembic upgrade head`.
 
 You can override the DB location with `DATABASE_URL`, e.g. `export DATABASE_URL="sqlite:////tmp/shopper.db"`.
 

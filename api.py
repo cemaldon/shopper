@@ -42,7 +42,6 @@ def seed_db_if_empty(session):
     session.commit()
 
 
-@app.before_first_request
 def setup_db():
     init_db()
     db = SessionLocal()
@@ -50,6 +49,11 @@ def setup_db():
         seed_db_if_empty(db)
     finally:
         db.close()
+
+
+# Initialize the DB and seed example history when the app loads.
+# This avoids Flask 3 compatibility issues with the removed before_first_request decorator.
+setup_db()
 
 
 @app.route("/health", methods=["GET"])
