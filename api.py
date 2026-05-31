@@ -1,11 +1,12 @@
 """Flask API wrapper for the grocery suggestion engine with DB persistence."""
 
 from flask import Flask, request, jsonify
-from app import build_association_rules, suggest_items
-from db import SessionLocal, init_db
-from models import Trip
-from seed_util import seed_db_if_empty
+from shopper.app import build_association_rules, suggest_items
+from shopper.db import SessionLocal, init_db
+from shopper.models import Trip
+from shopper.seed_util import seed_db_if_empty, INITIAL_HISTORY
 import logging
+import os
 
 # Basic logging for startup/seed visibility
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,14 @@ def setup_db():
     init_db()
     db = SessionLocal()
     try:
+        # Check if --reseed is set via environment variable (useful for container startup)
+        force_reseed = os.environ.get("RESEED_ON_STARTUP", "").lower() in ("1", "true", "yes")
+        if force_reseed:
+            logger.info("RESEED_ON_STARTUP detected; forcing a reseed.")
+            db.execute("DELETE FROM trip_products")
+            db.execute("DELETE FROM trips")
+            db.commit()
+
         seed_db_if_empty(db)
     except Exception:
         logger.exception("Error while seeding the database")
