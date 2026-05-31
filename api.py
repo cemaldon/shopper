@@ -4,6 +4,11 @@ from flask import Flask, request, jsonify
 from app import build_association_rules, suggest_items
 from db import SessionLocal, init_db
 from models import Product, Trip
+import logging
+
+# Basic logging for startup/seed visibility
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 INITIAL_HISTORY = [
     ["milk", "bread", "eggs", "apples"],
@@ -28,7 +33,12 @@ def get_grocery_history_from_db(session):
 def seed_db_if_empty(session):
     # If there are no trips, seed from INITIAL_HISTORY
     if session.query(Trip).first() is not None:
+        logger.info("Database already has trips; skipping seeding.")
         return
+
+    logger.info("Seeding database with %d trips from INITIAL_HISTORY.", len(INITIAL_HISTORY))
+    product_count_before = session.query(Product).count()
+    trips_added = 0
 
     for trip_items in INITIAL_HISTORY:
         trip = Trip()
@@ -37,16 +47,30 @@ def seed_db_if_empty(session):
             prod = session.query(Product).filter_by(name=name).first()
             if prod is None:
                 prod = Product(name=name)
+                session.add(prod)
+                session.flush()
             trip.products.append(prod)
         session.add(trip)
+        trips_added += 1
+
     session.commit()
+    product_count_after = session.query(Product).count()
+    logger.info(
+        "Seeding complete: %d trips added, %d new products added.",
+        trips_added,
+        product_count_after - product_count_before,
+    )
 
 
 def setup_db():
+    logger.info("Initializing DB...")
     init_db()
     db = SessionLocal()
     try:
         seed_db_if_empty(db)
+    except Exception:
+        logger.exception("Error while seeding the database")
+        raise
     finally:
         db.close()
 
