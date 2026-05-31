@@ -2,7 +2,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///shopper.db")
+# Use DATABASE_URL if provided, otherwise place SQLite DB next to this file
+here = os.path.dirname(os.path.abspath(__file__))
+default_sqlite_path = os.path.join(here, "shopper.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{default_sqlite_path}")
 
 engine = create_engine(
     DATABASE_URL,
