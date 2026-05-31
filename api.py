@@ -3,22 +3,13 @@
 from flask import Flask, request, jsonify
 from app import build_association_rules, suggest_items
 from db import SessionLocal, init_db
-from models import Product, Trip
+from models import Trip
+from seed_util import seed_db_if_empty
 import logging
 
 # Basic logging for startup/seed visibility
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-INITIAL_HISTORY = [
-    ["milk", "bread", "eggs", "apples"],
-    ["milk", "bread", "cereal"],
-    ["eggs", "bread", "butter"],
-    ["milk", "bread", "eggs", "butter"],
-    ["milk", "cereal", "apples"],
-    ["eggs", "butter"],
-    ["milk", "bread", "eggs"],
-]
 
 
 app = Flask(__name__)
@@ -30,36 +21,7 @@ def get_grocery_history_from_db(session):
     return history
 
 
-def seed_db_if_empty(session):
-    # If there are no trips, seed from INITIAL_HISTORY
-    if session.query(Trip).first() is not None:
-        logger.info("Database already has trips; skipping seeding.")
-        return
-
-    logger.info("Seeding database with %d trips from INITIAL_HISTORY.", len(INITIAL_HISTORY))
-    product_count_before = session.query(Product).count()
-    trips_added = 0
-
-    for trip_items in INITIAL_HISTORY:
-        trip = Trip()
-        for name in trip_items:
-            name = name.strip().lower()
-            prod = session.query(Product).filter_by(name=name).first()
-            if prod is None:
-                prod = Product(name=name)
-                session.add(prod)
-                session.flush()
-            trip.products.append(prod)
-        session.add(trip)
-        trips_added += 1
-
-    session.commit()
-    product_count_after = session.query(Product).count()
-    logger.info(
-        "Seeding complete: %d trips added, %d new products added.",
-        trips_added,
-        product_count_after - product_count_before,
-    )
+# Seeding is handled by `seed_util.seed_db_if_empty` which is imported above.
 
 
 def setup_db():

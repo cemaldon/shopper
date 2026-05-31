@@ -2,7 +2,20 @@ numpy
 pandas
 openvino>=2024.0.0
 
+scipy
+scikit-learn
 mlxtend
 flask
 sqlalchemy
 alembic
+gunicorn
+psycopg2-binary
+pytest
+pytest-cov
+pytest-mock
+pytest-flask
+black
+flake8
+isort
+mypy
+pre-commit
